@@ -6,8 +6,4 @@ class NotificationsConfig(AppConfig):
     name = 'notifications'
 
     def ready(self):
-        """
-        Import signal receivers when the application registry is fully populated.
-        This guarantees that receivers are registered and ready to handle signals.
-        """
-        import notifications.signals  # noqa: F401
+        import notifications.signals

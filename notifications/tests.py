@@ -10,10 +10,6 @@ from notifications.models import Tag, Post, DeletedPost
 
 
 class Phase1ModelsTestCase(TestCase):
-    """
-    Phase 1 unit tests: Validate Tag, Post, and DeletedPost models and relationships.
-    """
-
     def test_tag_creation_and_str(self):
         tag = Tag.objects.create(name="django")
         self.assertEqual(str(tag), "django")
@@ -50,10 +46,6 @@ class Phase1ModelsTestCase(TestCase):
 
 
 class Phase2SignalSetupTestCase(TestCase):
-    """
-    Phase 2 unit tests: Validate signal module wiring and application ready() hook.
-    """
-
     def test_notifications_config_is_loaded(self):
         app_config = apps.get_app_config('notifications')
         self.assertEqual(app_config.name, 'notifications')
@@ -65,10 +57,6 @@ class Phase2SignalSetupTestCase(TestCase):
 
 
 class Phase3PreSaveSignalTestCase(TestCase):
-    """
-    Phase 3 unit tests: Validate pre_save automatic slug generation on Post.
-    """
-
     def test_pre_save_auto_generates_slug_when_empty(self):
         stdout_capture = io.StringIO()
         with redirect_stdout(stdout_capture):
@@ -94,7 +82,6 @@ class Phase3PreSaveSignalTestCase(TestCase):
         )
         self.assertEqual(post.slug, "initial-slug")
 
-        # Clear slug and update title
         post.slug = ""
         post.title = "Updated New Title"
         post.save()
@@ -102,10 +89,6 @@ class Phase3PreSaveSignalTestCase(TestCase):
 
 
 class Phase4PostSaveSignalTestCase(TestCase):
-    """
-    Phase 4 unit tests: Validate post_save welcome notification on User creation.
-    """
-
     def test_post_save_user_welcome_email_on_creation(self):
         stdout_capture = io.StringIO()
         with redirect_stdout(stdout_capture):
@@ -133,3 +116,33 @@ class Phase4PostSaveSignalTestCase(TestCase):
 
         output = stdout_capture.getvalue()
         self.assertNotIn("[EMAIL NOTIFICATION]", output)
+
+
+class Phase5DeleteSignalsTestCase(TestCase):
+    def test_pre_delete_creates_backup_record(self):
+        post = Post.objects.create(
+            title="Post to Archive Before Deletion",
+            content="Archival payload content."
+        )
+        post_id = post.pk
+        post_title = post.title
+        post_slug = post.slug
+
+        self.assertEqual(DeletedPost.objects.filter(original_post_id=post_id).count(), 0)
+
+        stdout_capture = io.StringIO()
+        with redirect_stdout(stdout_capture):
+            post.delete()
+
+        output = stdout_capture.getvalue()
+        self.assertIn("[PRE-DELETE BACKUP]", output)
+        self.assertIn("[POST-DELETE]", output)
+
+        self.assertFalse(Post.objects.filter(pk=post_id).exists())
+
+        backup = DeletedPost.objects.filter(original_post_id=post_id).first()
+        self.assertIsNotNone(backup)
+        self.assertEqual(backup.title, post_title)
+        self.assertEqual(backup.slug, post_slug)
+        self.assertEqual(backup.content, "Archival payload content.")
+        self.assertIsNotNone(backup.deleted_at)
