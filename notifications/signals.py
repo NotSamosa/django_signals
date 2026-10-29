@@ -1,6 +1,6 @@
 import logging
 from django.contrib.auth.models import User
-from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
+from django.db.models.signals import pre_save, post_save, pre_delete, post_delete, m2m_changed
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.text import slugify
@@ -54,3 +54,13 @@ def post_delete_post_handler(sender, instance, **kwargs):
 
 
 post_delete.connect(post_delete_post_handler, sender=Post, dispatch_uid="post_delete_post_manual")
+
+
+@receiver(m2m_changed, sender=Post.tags.through)
+def track_post_tags_changes(sender, instance, action, pk_set, **kwargs):
+    if action in ["pre_add", "post_remove"]:
+        now_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+        pk_list = sorted(list(pk_set)) if pk_set else []
+        log_msg = f"[{now_str}] [M2M TRACKING] Action: '{action}' | Instance: Post '{instance.title}' (ID: {instance.pk}) | Affected Tag PKs: {pk_list}"
+        print(log_msg)
+        logger.info(log_msg)

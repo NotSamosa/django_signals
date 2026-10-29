@@ -146,3 +146,30 @@ class Phase5DeleteSignalsTestCase(TestCase):
         self.assertEqual(backup.slug, post_slug)
         self.assertEqual(backup.content, "Archival payload content.")
         self.assertIsNotNone(backup.deleted_at)
+
+
+class Phase6M2MSignalTestCase(TestCase):
+    def setUp(self):
+        self.tag_django = Tag.objects.create(name="django")
+        self.tag_signals = Tag.objects.create(name="signals")
+
+    def test_m2m_changed_pre_add_and_post_remove(self):
+        post = Post.objects.create(title="Post For M2M Testing")
+
+        stdout_capture_add = io.StringIO()
+        with redirect_stdout(stdout_capture_add):
+            post.tags.add(self.tag_django, self.tag_signals)
+
+        output_add = stdout_capture_add.getvalue()
+        self.assertIn("Action: 'pre_add'", output_add)
+        self.assertIn(f"ID: {post.pk}", output_add)
+        self.assertIn(f"Affected Tag PKs: {[self.tag_django.pk, self.tag_signals.pk]}", output_add)
+
+        stdout_capture_remove = io.StringIO()
+        with redirect_stdout(stdout_capture_remove):
+            post.tags.remove(self.tag_signals)
+
+        output_remove = stdout_capture_remove.getvalue()
+        self.assertIn("Action: 'post_remove'", output_remove)
+        self.assertIn(f"ID: {post.pk}", output_remove)
+        self.assertIn(f"Affected Tag PKs: [{self.tag_signals.pk}]", output_remove)
