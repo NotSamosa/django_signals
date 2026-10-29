@@ -2,6 +2,7 @@ import io
 import sys
 from contextlib import redirect_stdout
 from django.apps import apps
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils.text import slugify
 
@@ -98,3 +99,37 @@ class Phase3PreSaveSignalTestCase(TestCase):
         post.title = "Updated New Title"
         post.save()
         self.assertEqual(post.slug, slugify("Updated New Title"))
+
+
+class Phase4PostSaveSignalTestCase(TestCase):
+    """
+    Phase 4 unit tests: Validate post_save welcome notification on User creation.
+    """
+
+    def test_post_save_user_welcome_email_on_creation(self):
+        stdout_capture = io.StringIO()
+        with redirect_stdout(stdout_capture):
+            user = User.objects.create_user(
+                username="new_intern",
+                email="intern@example.com",
+                password="Password123!"
+            )
+
+        output = stdout_capture.getvalue()
+        self.assertIn("[POST-SAVE] New user created", output)
+        self.assertIn("[EMAIL NOTIFICATION] Welcome email sent to: intern@example.com", output)
+
+    def test_post_save_user_no_welcome_email_on_update(self):
+        user = User.objects.create_user(
+            username="existing_intern",
+            email="existing@example.com",
+            password="Password123!"
+        )
+
+        stdout_capture = io.StringIO()
+        with redirect_stdout(stdout_capture):
+            user.first_name = "InternName"
+            user.save()
+
+        output = stdout_capture.getvalue()
+        self.assertNotIn("[EMAIL NOTIFICATION]", output)
